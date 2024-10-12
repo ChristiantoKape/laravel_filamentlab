@@ -56,6 +56,7 @@ class RoleResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
+                    ->sortable(),
             ])
             ->filters([
                 //

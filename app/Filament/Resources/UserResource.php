@@ -16,7 +16,9 @@ use Filament\Tables\Filters\Filter;
 use Illuminate\Support\Facades\Hash;
 use Filament\Forms\Components\Section;
 use Illuminate\Database\Eloquent\Model;
+use Filament\Forms\Components\TextInput;
 use Spatie\Permission\Models\Permission;
+use Illuminate\Database\Eloquent\Builder;
 use App\Filament\Resources\UserResource\Pages;
 
 class UserResource extends Resource
@@ -84,6 +86,11 @@ class UserResource extends Resource
 
                                         return $permissions;
                                     })
+                                    ->createOptionForm([
+                                        TextInput::make('name')
+                                            ->label('Permission Name')
+                                    ])
+                                    ->createOptionModalHeading('Add New Permission')
                                     ->hidden(fn (Get $get) => !$get('roles'))
                             ]),
                     ])
@@ -99,9 +106,37 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('roles')
-                    ->formatStateUsing(fn ($record) => $record->roles->pluck('name')->join(', ')),
+                    ->formatStateUsing(fn ($record) => $record->roles->pluck('name')->join(', '))
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('roles', function (Builder $query) use ($search) {
+                            $query->where('name', 'like', "%{$search}%");
+                        });
+                    })
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy(
+                            Role::select('name')
+                                ->join('model_has_roles', 'roles.id', '=', 'model_has_roles.role_id')
+                                ->whereColumn('model_has_roles.model_id', 'users.id')
+                                ->orderBy('name', $direction)
+                                ->limit(1)
+                        , $direction);
+                    }),
                 Tables\Columns\TextColumn::make('permissions')
-                    ->formatStateUsing(fn ($record) => $record->permissions->pluck('name')->join(', ')),
+                    ->formatStateUsing(fn ($record) => $record->permissions->pluck('name')->join(', '))
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('permissions', function (Builder $query) use ($search) {
+                            $query->where('name', 'like', "%{$search}%");
+                        });
+                    })
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy(
+                            Permission::select('name')
+                                ->join('model_has_permissions', 'permissions.id', '=', 'model_has_permissions.permission_id')
+                                ->whereColumn('model_has_permissions.model_id', 'users.id')
+                                ->orderBy('name', $direction)
+                                ->limit(1)
+                        , $direction);
+                    }),
             ])
             ->filters([
                 // 
