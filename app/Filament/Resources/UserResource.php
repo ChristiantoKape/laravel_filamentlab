@@ -5,22 +5,19 @@ namespace App\Filament\Resources;
 use Filament\Forms;
 use App\Models\User;
 use Filament\Tables;
+use Filament\Forms\Get;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Filament\Resources\Resource;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Filament\Forms\Components\Grid;
+use Filament\Tables\Filters\Filter;
 use Illuminate\Support\Facades\Hash;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Fieldset;
 use Illuminate\Database\Eloquent\Model;
-use Filament\Forms\Components\TextInput;
 use Spatie\Permission\Models\Permission;
-use Illuminate\Database\Eloquent\Builder;
 use App\Filament\Resources\UserResource\Pages;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use App\Filament\Resources\UserResource\RelationManagers;
 
 class UserResource extends Resource
 {
@@ -58,35 +55,36 @@ class UserResource extends Resource
                                     ->options(
                                         Role::all()->pluck('name', 'id')
                                     )
-                                    ->default(fn (?Model $record) => $record ? $record->role_id : null)
+                                    ->default(fn (?Model $record) => $record ? $record->roles->pluck('id')->first() : null)
                                     ->reactive()
-                                    ->afterStateUpdated(function (callable $set) {
-                                        $set('permission', null);
+                                    ->afterStateUpdated(function (callable $set, $state) {
+                                        if ($state) {
+                                            $role = Role::findById($state);
+                                            $permissions = $role->permissions->pluck('id')->toArray();
+                                            $set('permissions', $permissions);
+                                        } else {
+                                            $set('permissions', []);
+                                        }
                                     }),
-                                Forms\Components\Select::make('permission')
-                                    ->label('Direct Permission')
+                                Forms\Components\Select::make('permissions')
+                                    ->multiple()
+                                    ->label('Permissions')
                                     ->relationship('permissions', 'name')
-                                    ->options(function (callable $get) {
+                                    ->options(function (Get $get) {
                                         $roleId = $get('roles');
                                         if (!$roleId) {
-                                            return [];
+                                            return Permission::pluck('name', 'id')->toArray();
                                         }
 
                                         $role = Role::where('id', $roleId)->first();
-                                        if (!$role) {
-                                            return [];
-                                        }
 
                                         $roleName = strtolower($role->name);
                                         $permissions = Permission::where('name', 'like', '%' . $roleName . '%')
                                             ->pluck('name', 'id');
+
                                         return $permissions;
                                     })
-                                    ->createOptionForm([
-                                        TextInput::make('name')
-                                            ->label('Permission Name')
-                                    ])
-                                    ->disabled(fn(callable $get) => !$get('roles'))
+                                    ->hidden(fn (Get $get) => !$get('roles'))
                             ]),
                     ])
             ]);
@@ -100,20 +98,13 @@ class UserResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('email')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('email_verified_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('roles')
+                    ->formatStateUsing(fn ($record) => $record->roles->pluck('name')->join(', ')),
+                Tables\Columns\TextColumn::make('permissions')
+                    ->formatStateUsing(fn ($record) => $record->permissions->pluck('name')->join(', ')),
             ])
             ->filters([
-                //
+                // 
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
