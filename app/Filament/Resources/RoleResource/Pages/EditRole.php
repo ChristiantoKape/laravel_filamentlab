@@ -2,9 +2,12 @@
 
 namespace App\Filament\Resources\RoleResource\Pages;
 
-use App\Filament\Resources\RoleResource;
 use Filament\Actions;
+use Filament\Actions\EditAction;
+use App\Filament\Resources\RoleResource;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+
 
 class EditRole extends EditRecord
 {
@@ -17,14 +20,13 @@ class EditRole extends EditRecord
         ];
     }
 
-    
-    protected function getCreatedNotificationTitle(): ?string
-    {
-        return 'Role Updated!';
-    }
-    
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');
+    }
+
+    protected function getSavedNotificationTitle(): ?string
+    {
+        return 'Role updated';
     }
 }

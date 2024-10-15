@@ -17,9 +17,9 @@ class EditUser extends EditRecord
         ];
     }
 
-    protected function getCreatedNotificationTitle(): ?string
+    protected function getSavedNotificationTitle(): ?string
     {
-        return 'User Updated!';
+        return 'User updated';
     }
 
     protected function getRedirectUrl(): string

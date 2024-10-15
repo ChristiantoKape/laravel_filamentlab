@@ -10,13 +10,11 @@ class CreateRole extends CreateRecord
 {
     protected static string $resource = RoleResource::class;
 
-    protected static ?string $title = 'Roles & Permission';
-
     protected function getCreatedNotificationTitle(): ?string
     {
         return 'Role Created';
     }
-    
+
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');

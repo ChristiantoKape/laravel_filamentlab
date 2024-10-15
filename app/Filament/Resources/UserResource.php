@@ -53,16 +53,17 @@ class UserResource extends Resource
                         Grid::make(2)
                             ->schema([
                                 Forms\Components\Select::make('roles')
+                                    ->multiple()
                                     ->relationship('roles', 'name')
                                     ->options(
                                         Role::all()->pluck('name', 'id')
                                     )
-                                    ->default(fn (?Model $record) => $record ? $record->roles->pluck('id')->first() : null)
+                                    ->default(fn (?Model $record) => $record ? $record->roles->pluck('id')->toArray() : [])
                                     ->reactive()
                                     ->afterStateUpdated(function (callable $set, $state) {
-                                        if ($state) {
-                                            $role = Role::findById($state);
-                                            $permissions = $role->permissions->pluck('id')->toArray();
+                                        if (!empty($state)) {
+                                            $roles = Role::whereIn('id', $state)->get();
+                                            $permissions = $roles->flatMap->permissions->pluck('id')->unique()->toArray();
                                             $set('permissions', $permissions);
                                         } else {
                                             $set('permissions', []);
@@ -70,21 +71,22 @@ class UserResource extends Resource
                                     }),
                                 Forms\Components\Select::make('permissions')
                                     ->multiple()
-                                    ->label('Permissions')
+                                    ->label('Direct Permission')
                                     ->relationship('permissions', 'name')
                                     ->options(function (Get $get) {
-                                        $roleId = $get('roles');
-                                        if (!$roleId) {
+                                        $roleIds = $get('roles');
+                                        if (empty($roleIds)) {
                                             return Permission::pluck('name', 'id')->toArray();
                                         }
-
-                                        $role = Role::where('id', $roleId)->first();
-
-                                        $roleName = strtolower($role->name);
-                                        $permissions = Permission::where('name', 'like', '%' . $roleName . '%')
-                                            ->pluck('name', 'id');
-
-                                        return $permissions;
+                                    
+                                        $roles = Role::whereIn('id', $roleIds)->get();
+                                        $roleNames = $roles->pluck('name')->map(fn($name) => strtolower($name))->toArray();
+                                    
+                                        return Permission::where(function ($query) use ($roleNames) {
+                                            foreach ($roleNames as $roleName) {
+                                                $query->orWhere('name', 'like', '%' . $roleName . '%');
+                                            }
+                                        })->pluck('name', 'id')->toArray();
                                     })
                                     ->createOptionForm([
                                         TextInput::make('name')
@@ -92,6 +94,7 @@ class UserResource extends Resource
                                     ])
                                     ->createOptionModalHeading('Add New Permission')
                                     ->hidden(fn (Get $get) => !$get('roles'))
+                                    ->preload()
                             ]),
                     ])
             ]);
@@ -102,9 +105,11 @@ class UserResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('email')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('roles')
                     ->formatStateUsing(fn ($record) => $record->roles->pluck('name')->join(', '))
                     ->searchable(query: function (Builder $query, string $search): Builder {
@@ -149,6 +154,7 @@ class UserResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+            // ->modifyQueryUsing(fn (Builder $query) => $query->withoutGlobalScopes()->where('name', '!=', 'Admin'));
     }
 
     public static function getRelations(): array
