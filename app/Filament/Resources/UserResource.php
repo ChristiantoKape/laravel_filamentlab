@@ -60,14 +60,19 @@ class UserResource extends Resource
                                     )
                                     ->default(fn (?Model $record) => $record ? $record->roles->pluck('id')->toArray() : [])
                                     ->reactive()
-                                    ->afterStateUpdated(function (callable $set, $state) {
-                                        if (!empty($state)) {
-                                            $roles = Role::whereIn('id', $state)->get();
-                                            $permissions = $roles->flatMap->permissions->pluck('id')->unique()->toArray();
-                                            $set('permissions', $permissions);
-                                        } else {
+                                    ->afterStateUpdated(function ($state, callable $set, ?Model $record) {
+                                        if (empty($state)) {
+                                            // Jika roles kosong, hapus semua permissions
                                             $set('permissions', []);
+                                            if ($record) {
+                                                $record->permissions()->detach();
+                                            }
+                                            return;
                                         }
+                                        
+                                        $roles = Role::whereIn('id', $state)->get();
+                                        $permissions = $roles->flatMap->permissions->pluck('id')->unique()->toArray();
+                                        $set('permissions', $permissions);
                                     }),
                                 Forms\Components\Select::make('permissions')
                                     ->multiple()
@@ -93,7 +98,8 @@ class UserResource extends Resource
                                             ->label('Permission Name')
                                     ])
                                     ->createOptionModalHeading('Add New Permission')
-                                    ->hidden(fn (Get $get) => !$get('roles'))
+                                    ->hidden(fn (Get $get) => empty($get('roles')))
+                                    ->dehydrated(fn (Get $get) => !empty($get('roles')))
                                     ->preload()
                             ]),
                     ])
