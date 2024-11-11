@@ -25,19 +25,44 @@ class ManageHomepage extends Page
     protected static ?string $navigationLabel = 'Homepage Settings';
     
     public $heroes = [];
-    public $achievements = []; // Tambahkan ini
+    public $heroes_titles = [];
+    public $heroes_banner_desktop = [];
+    public $heroes_banner_mobile = [];
+    public $heroes_descriptions = [];
+    public $heroes_button_text = [];
+    public $heroes_button_url = [];
     public $isEditing = false;
     
     public function mount(): void
     {
         $settings = app(HomepageSettings::class);
 
-        $this->heroes = $settings->heroes ?? [];
-        $this->achievements = $settings->achievements ?? [];
+        $this->heroes_titles = $settings->heroes_titles ?? [];
+        $this->heroes_banner_desktop = $settings->heroes_banner_desktop ?? [];
+        $this->heroes_banner_mobile = $settings->heroes_banner_mobile ?? [];
+        $this->heroes_descriptions = $settings->heroes_descriptions ?? [];
+        $this->heroes_button_text = $settings->heroes_button_text ?? [];
+        $this->heroes_button_url = $settings->heroes_button_url ?? [];
 
+        // Transform data for form
+        $heroes = [];
+        $count = count($this->heroes_titles);
+        
+        for ($i = 0; $i < $count; $i++) {
+            $heroes[] = [
+                'hero_title' => $this->heroes_titles[$i] ?? '',
+                'hero_banner_image_desktop' => $this->heroes_banner_desktop[$i] ?? '',
+                'hero_banner_image_mobile' => $this->heroes_banner_mobile[$i] ?? '',
+                'short_description' => $this->heroes_descriptions[$i] ?? '',
+                'button_text' => $this->heroes_button_text[$i] ?? '',
+                'button_url' => $this->heroes_button_url[$i] ?? '',
+            ];
+        }
+
+        $this->heroes = $heroes; // Set heroes array untuk form
+        
         $this->form->fill([
             'heroes' => $this->heroes,
-            'achievements' => $this->achievements,
         ]);
     }
 
@@ -130,43 +155,44 @@ class ManageHomepage extends Page
                             ->itemLabel('')
                             ->collapsible(false)
                     ]),
-
-                Section::make('Achievements Section')
-                    ->schema([
-                        Repeater::make('achievements')
-                            ->label('')
-                            ->schema([
-                                TextInput::make('achievement_title')
-                                    ->label('Title')
-                                    ->required()
-                                    ->disabled(fn () => !$this->isEditing)
-                                    ->maxLength(150),
-                            ])
-                            ->disabled(fn () => !$this->isEditing)
-                            ->deletable(fn () => $this->isEditing)
-                            ->addActionLabel('Add Achievement')
-                            ->hiddenLabel()
-                            ->grid(1)
-                            ->itemLabel('')
-                            ->collapsible(false)
-                        ]),
             ]);
     }
     
     public function submit(): void
     {
         if (!$this->isEditing) {
-            return; // Jangan submit jika bukan mode edit
+            return;
         }
 
         $settings = app(HomepageSettings::class);
         $data = $this->form->getState();
 
-        $settings->heroes = $data['heroes'] ?? [];
-        $settings->achievements = $data['achievements'] ?? [];
+        // Transform heroes data for storage
+        $heroes_titles = [];
+        $heroes_banner_desktop = [];
+        $heroes_banner_mobile = [];
+        $heroes_descriptions = [];
+        $heroes_button_text = [];
+        $heroes_button_url = [];
+
+        foreach ($data['heroes'] as $hero) {
+            $heroes_titles[] = $hero['hero_title'];
+            $heroes_banner_desktop[] = $hero['hero_banner_image_desktop'];
+            $heroes_banner_mobile[] = $hero['hero_banner_image_mobile'];
+            $heroes_descriptions[] = $hero['short_description'];
+            $heroes_button_text[] = $hero['button_text'];
+            $heroes_button_url[] = $hero['button_url'];
+        }
+
+        $settings->heroes_titles = $heroes_titles;
+        $settings->heroes_banner_desktop = $heroes_banner_desktop;
+        $settings->heroes_banner_mobile = $heroes_banner_mobile;
+        $settings->heroes_descriptions = $heroes_descriptions;
+        $settings->heroes_button_text = $heroes_button_text;
+        $settings->heroes_button_url = $heroes_button_url;
         $settings->save();
         
-        $this->isEditing = false; // Kembali ke mode view setelah save
+        $this->isEditing = false;
         
         Notification::make()
             ->success()

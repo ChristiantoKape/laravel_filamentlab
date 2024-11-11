@@ -11,14 +11,14 @@ return new class extends Migration
         Schema::create('settings', function (Blueprint $table): void {
             $table->id();
 
-            $table->string('group');
-            $table->string('name');
+            $table->string('group')->index();  // Tambahkan group
+            $table->string('name');            // Tambahkan name
+            $table->json('payload');           // Ganti value menjadi payload
             $table->boolean('locked')->default(false);
-            $table->json('payload');
 
             $table->timestamps();
 
-            $table->unique(['group', 'name']);
+            $table->unique(['group', 'name']); // Buat composite unique index
         });
     }
 
